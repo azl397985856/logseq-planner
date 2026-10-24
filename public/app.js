@@ -162,6 +162,28 @@ function renderPage() {
   plainBuf = []; plainLines = 0;
   let secState = null; // {badge, total, done}
 
+  // 置顶：未完成的高优（[#A]）任务汇总，点击跳到原位置
+  const pins = tasks.filter(t => t.priority === 'A' && t.status !== 'DONE' && t.status !== 'CANCELED');
+  if (pins.length) {
+    const pin = document.createElement('section');
+    pin.className = 'pin';
+    pin._noAdd = true;
+    pin.innerHTML = `<h2>❗ 高优先级 <span class="sec-badge pin-badge">${pins.length}</span></h2>`;
+    pins.forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'mp-row pin-row';
+      row.innerHTML =
+        `<span class="chip st-${b.status || 'none'}">${b.status || '·'}</span>` +
+        `<span class="prio p-A">❗A</span>` +
+        `<span class="mp-text">${renderText(b.text)}</span>` +
+        (b.section ? `<span class="mp-sec">${escapeHtml(b.section.replace(/\[\[|\]\]/g, ''))}</span>` : '');
+      row.title = '点击跳到原位置';
+      row.addEventListener('click', () => scrollToBlock(b.start));
+      pin.appendChild(row);
+    });
+    c.appendChild(pin);
+  }
+
   // 预处理：把连续的"数字型小节标题"（理财参考表）合并成一条
   const blocks = mergeRefTables(PAGE.blocks);
 

@@ -323,6 +323,14 @@ section .pl-item::before { background: var(--sec, #b9b5a1); opacity: .55; }
 .editor-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 .editor-actions .muted-small { margin-right: auto; }
 
+/* 置顶高优卡片 */
+section.pin { border-top-color: var(--red); }
+section.pin h2 { color: #9c3f2c; }
+section.pin h2::before { background: var(--red); }
+.pin-badge { color: #fff !important; background: var(--red) !important; }
+.pin-row { font-size: 14px; }
+.pin-row .mp-text { font-weight: 600; white-space: normal; }
+
 /* 添加条 */
 .add-bar { margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 6px; }
 .add-btn {
