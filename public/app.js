@@ -139,12 +139,7 @@ function renderPage() {
   $('#pageMeta').innerHTML =
     `<span class="meta-chip on link" data-kind="open">${open.length} 项进行中</span>` +
     `<span class="meta-chip ok link" data-kind="done">${done.length} 项已完成</span>` +
-    (isCur ? '<span class="meta-chip cur">当前月</span>' : '');
-
-  const total = open.length + done.length;
-  const pct = total ? Math.round(done.length / total * 100) : 0;
-  $('#progress').hidden = !total;
-  $('#progress').innerHTML = `<div class="progress-bar" style="width:${pct}%"></div><span class="progress-label">${pct}%</span>`;
+    (isCur ? '<span class="meta-chip passive">当前月</span>' : '');
 
   $('#btnGen').hidden = !isPlan;
   $('#btnOpenLogseq').hidden = false;
@@ -195,7 +190,7 @@ function renderPage() {
     sectionEl._lastEnd = -1;
     sectionEl._taskCount = 0;
     sectionEl._hasContent = false;
-    sectionEl._linked = false;
+    sectionEl._title = title || '';
     sectionEl._untitled = !title;
     if (!title) sectionEl.classList.add('no-title');
     const color = sectionColor(title);
@@ -247,7 +242,6 @@ function renderPage() {
     }
     if (b.kind === 'heading' && b.level <= 2) {
       ensureSection(b.text);
-      sectionEl._linked = /\[\[/.test(b.text);
       sectionEl._lastEnd = b.end;
       if (childLines(b).length) sectionEl._hasContent = true;
       pushChildPlain(b);
@@ -280,12 +274,12 @@ function renderPage() {
   }
   flushPlain();
 
-  // 添加入口：只出现在真正记任务的地方
-  // （链接型分区如 [[工作]]、模板型分区如健康、开头区、利息表都不显示）
+  // 添加入口：除了开头无标题区、利息表、纯模板参考分区（健康等），其余都可以添加
+  const ALWAYS_ADD = /^(自媒体|工作|Bonus)/;
   const sections = c.querySelectorAll('section');
   sections.forEach((sec) => {
-    if (sec._noAdd || sec._untitled || sec._linked) return;
-    if (sec._taskCount === 0 && sec._hasContent) return;
+    if (sec._noAdd || sec._untitled) return;
+    if (!ALWAYS_ADD.test(sec._title) && sec._taskCount === 0 && sec._hasContent) return;
     attachAddBar(sec);
   });
 }
