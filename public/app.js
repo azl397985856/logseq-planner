@@ -319,7 +319,7 @@ function mergeRefTables(raw) {
 function pushChildPlain(b) {
   const sub = childLines(b);
   if (!sub.length) return;
-  plainBuf.push(sub.map(l => `<div class="plain-line">${renderText(l.replace(/\t/g, '    '))}</div>`).join(''));
+  plainBuf.push(sub.map(renderPlainLine).join(''));
   plainLines += sub.length;
 }
 
@@ -342,12 +342,23 @@ function childLines(b) {
   for (let k = b.start + 1; k <= b.end; k++) {
     const l = PAGE.lines[k];
     if (!l.trim()) continue;
+    if (/^\s*-\s*$/.test(l)) continue; // 空占位 bullet
     if (/^\s*:(LOGBOOK|END):\s*$/.test(l)) continue;
     if (/^\s*CLOCK:/.test(l)) continue;
     if (/^\s*\* State /.test(l)) continue;
     out.push(l);
   }
   return out;
+}
+
+/* 折叠笔记里的普通行：原始 markdown 横杠换成圆点，带序号的行保留序号 */
+function renderPlainLine(l) {
+  const s = l.replace(/\t/g, '    ');
+  let m = /^\s*-\s+(.+)$/.exec(s);
+  if (m) return `<div class="plain-line pl-item">${renderText(m[1])}</div>`;
+  m = /^\s*(\d+[.)])\s+(.+)$/.exec(s);
+  if (m) return `<div class="plain-line pl-item pl-num"><span class="pl-no">${m[1]}</span>${renderText(m[2])}</div>`;
+  return `<div class="plain-line pl-cont">${renderText(s)}</div>`;
 }
 
 /* ---------- 块渲染（含悬浮编辑/删除） ---------- */
@@ -373,7 +384,7 @@ function blockEl(b) {
   if (sub.length) {
     const d = document.createElement('div');
     d.className = 'task-sub';
-    d.innerHTML = sub.map(l => `<div>${renderText(l.replace(/\t/g, '    '))}</div>`).join('');
+    d.innerHTML = sub.map(renderPlainLine).join('');
     wrap.appendChild(d);
   }
 
