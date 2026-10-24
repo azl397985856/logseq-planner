@@ -344,6 +344,13 @@ section.pin h2::before { background: var(--red); }
 .pin-row { font-size: 14px; }
 .pin-row .mp-text { font-weight: 600; white-space: normal; }
 
+/* markdown 图片 */
+.md-img {
+  display: block; max-width: min(460px, 100%); height: auto;
+  border-radius: 8px; margin: 6px 0;
+  border: 1px solid var(--border);
+}
+
 /* 添加条 */
 .add-bar { margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 6px; }
 .add-btn {

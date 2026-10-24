@@ -20,9 +20,17 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/* 渲染块文本：[[页面链接]]、URL、**加粗** */
+/* 渲染块文本：图片、[[页面链接]]、URL、**加粗**（编辑时展示原始文字） */
 function renderText(text) {
   let h = escapeHtml(text);
+  // ![alt](src) → 真图片；相对路径 ../assets/x.png 解析到 /assets/x.png
+  h = h.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, src) => {
+    let u = src.replace(/&amp;/g, '&');
+    if (/^https?:\/\//i.test(u)) return `<img class="md-img" src="${escapeHtml(u)}" alt="${escapeHtml(alt)}" loading="lazy">`;
+    u = u.replace(/^(\.\.\/)+/, '');
+    if (/^assets\//.test(u)) return `<img class="md-img" src="/${escapeHtml(u)}" alt="${escapeHtml(alt)}" loading="lazy">`;
+    return m;
+  });
   h = h.replace(/\[\[([^\]]+)\]\]/g, (m, p) => `<a class="wikilink" data-page="${escapeHtml(p.trim())}" href="#">${p.trim()}</a>`);
   h = h.replace(/https?:\/\/[^\s<>"）】]+[^\s<>"）】.,;、。，；]/g, u => {
     const esc = escapeHtml(u);

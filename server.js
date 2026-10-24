@@ -326,7 +326,7 @@ function readBody(req) {
   });
 }
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 const server = http.createServer(function (req, res) {
   const u = new URL(req.url, 'http://127.0.0.1');
@@ -335,6 +335,15 @@ const server = http.createServer(function (req, res) {
     handleApi(req, res, p, u).catch(function (e) {
       json(res, 500, { error: String(e && e.message || e) });
     });
+    return;
+  }
+  if (p.startsWith('/assets/')) { // logseq 图片等资源
+    const rel = decodeURIComponent(p.slice('/assets/'.length));
+    if (!rel || rel.includes('..') || rel.includes('\\') || rel.startsWith('/')) { res.writeHead(404); res.end(); return; }
+    const full = path.join(GRAPH, 'assets', rel);
+    if (!fs.existsSync(full) || !fs.statSync(full).isFile()) { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(full).toLowerCase()] || 'application/octet-stream' });
+    res.end(fs.readFileSync(full));
     return;
   }
   let file = p === '/' ? '/index.html' : p;
