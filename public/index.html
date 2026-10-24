@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logseq 计划助手</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="logo">
+      <span class="logo-dot">✦</span>
+      <div>
+        <div class="logo-title">计划助手</div>
+        <div class="logo-sub" id="graphName"></div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">月度计划</div>
+        <div id="monthList"></div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">页面 <input id="pageFilter" placeholder="筛选…"></div>
+        <div id="pageList"></div>
+      </div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="sync-line"><span class="sync-dot" id="syncDot"></span><span id="syncText">已连接，自动同步</span></div>
+      <div class="muted-small">数据源是 pages/ 下的 markdown，改动直接写回，Logseq 实时同步</div>
+    </div>
+  </aside>
+
+  <main id="main">
+    <header id="pageHead">
+      <div class="head-titles">
+        <h1 id="pageTitle">加载中…</h1>
+        <div id="pageMeta" class="page-meta"></div>
+        <div class="progress" id="progress" hidden><div class="progress-bar" id="progressBar"></div></div>
+      </div>
+      <div class="head-actions">
+        <button id="btnReload" class="btn ghost icon" title="刷新">⟳</button>
+        <button id="btnOpenLogseq" class="btn ghost" title="用 Logseq 应用打开此页">在 Logseq 中打开</button>
+        <button id="btnGen" class="btn primary">✚ 生成新月计划</button>
+      </div>
+    </header>
+    <div id="banner"></div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<dialog id="genDialog">
+  <h3>生成新月计划</h3>
+  <p class="muted">根据 <b>月计划模板</b> 新建：模板内容 + 可选携带的未完成事项。模板改了，新计划自动用最新的。</p>
+  <div class="form-row">
+    <label>携带未完成事项（来自哪个月，可选）</label>
+    <select id="genSource"></select>
+  </div>
+  <div class="form-row">
+    <label>目标月份（新建）</label>
+    <input id="genTarget" placeholder="YYYY-MM" autocomplete="off">
+  </div>
+  <div class="form-row">
+    <label class="check"><input type="checkbox" id="genClean" checked> 清理未关闭的 CLOCK 记录</label>
+  </div>
+  <div id="genPreview" class="gen-preview" hidden></div>
+  <div id="genOverwrite" class="form-row warn" hidden>
+    <label class="check"><input type="checkbox" id="genOverwriteChk"> 目标月份已存在，确认覆盖（旧文件自动备份到 logseq/bak/pages/）</label>
+  </div>
+  <div class="dialog-actions">
+    <button class="btn ghost" id="genCancel">取消</button>
+    <button class="btn" id="genPreviewBtn">预览</button>
+    <button class="btn primary" id="genGo" disabled>生成</button>
+  </div>
+</dialog>
+
+<div id="statusMenu" class="menu" hidden></div>
+<div id="toast" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

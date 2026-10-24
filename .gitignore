@@ -1,0 +1,6 @@
+# 只推送工具本身，任何笔记/数据都不入库
+*.md
+!README.md
+.DS_Store
+nohup.out
+node_modules/
