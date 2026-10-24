@@ -409,20 +409,28 @@ function blockEl(b) {
   return wrap;
 }
 
-/* ---------- 行内编辑 ---------- */
+/* ---------- 行内编辑（整块：首行 + 子行） ---------- */
 function startEdit(wrap, b) {
   if (wrap.querySelector('.editor')) return;
+  const children = childLines(b).map(l => l.replace(/^\s+/, ''));
+  const hasChildren = children.length > 0;
   const editor = document.createElement('div');
   editor.className = 'editor';
   editor.innerHTML =
     `<textarea spellcheck="false"></textarea>
      <div class="editor-actions">
-       <span class="muted-small">Enter 保存 · Esc 取消</span>
+       <span class="muted-small ed-hint">Enter 保存 · Esc 取消</span>
        <button class="btn small ghost ed-cancel">取消</button>
        <button class="btn small primary ed-save">保存</button>
      </div>`;
   const ta = editor.querySelector('textarea');
-  ta.value = b.text;
+  const hint = editor.querySelector('.ed-hint');
+  ta.value = hasChildren ? b.text + '\n' + children.join('\n') : b.text;
+  ta.style.minHeight = Math.min(340, 56 + ta.value.split('\n').length * 20) + 'px';
+  const updateHint = () => {
+    hint.textContent = ta.value.includes('\n') ? '⌘/Ctrl+Enter 保存 · Enter 换行 · Esc 取消' : 'Enter 保存 · Esc 取消';
+  };
+  updateHint();
   wrap.style.display = 'none';
   wrap.parentNode.insertBefore(editor, wrap.nextSibling);
   ta.focus();
@@ -430,8 +438,8 @@ function startEdit(wrap, b) {
 
   const cancel = () => { editor.remove(); wrap.style.display = ''; };
   const save = async () => {
-    const text = ta.value.trim();
-    if (!text) { toast('内容不能为空', true); return; }
+    const text = ta.value.replace(/\s+$/, '');
+    if (!text.trim()) { toast('内容不能为空', true); return; }
     const r = await post('/api/edit', { name: PAGE.name, line: b.start, text: text });
     if (!r.ok) { toast(r.body.message || r.body.error || '保存失败', true); return; }
     noteSelfWrite(PAGE.name);
@@ -440,9 +448,13 @@ function startEdit(wrap, b) {
   };
   editor.querySelector('.ed-cancel').addEventListener('click', cancel);
   editor.querySelector('.ed-save').addEventListener('click', save);
+  ta.addEventListener('input', updateHint);
   ta.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
-    if (e.key === 'Escape') cancel();
+    const multiline = ta.value.includes('\n');
+    if (e.key === 'Escape') { cancel(); return; }
+    if (e.key === 'Enter') {
+      if (!multiline || e.metaKey || e.ctrlKey) { e.preventDefault(); save(); }
+    }
   });
 }
 

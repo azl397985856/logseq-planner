@@ -443,17 +443,33 @@ async function handleApi(req, res, p, u) {
   if (p === '/api/edit' && req.method === 'POST') {
     const body = await readBody(req);
     if (!safeName(body.name + '.md')) return json(res, 400, { error: 'bad name' });
-    const text = sanitizeText(body.text);
-    if (!text) return json(res, 400, { error: '内容不能为空' });
     const full = pagePath(body.name + '.md');
     if (!fs.existsSync(full)) return json(res, 404, { error: '页面不存在' });
     const lines = fs.readFileSync(full, 'utf8').split('\n');
     const blocks = fillPseudoBlocks(lines, splitBlocks(lines));
     const b = findBlockAt(blocks, body.line | 0);
     if (!b) return json(res, 409, { error: 'STALE', message: '文件已变化，请刷新后重试' });
-    const nl = rebuildFirstLine(lines[b.start], text);
+    // 多行编辑：首行 + 子行（\n 分隔）
+    const parts = String(body.text == null ? '' : body.text).replace(/\r/g, '').split('\n')
+      .map(function (l) { return l.replace(/\s+$/, '').slice(0, 5000); });
+    while (parts.length && !parts[parts.length - 1].trim()) parts.pop();
+    const firstText = (parts.shift() || '').trim();
+    if (!firstText && !parts.length) return json(res, 400, { error: '内容不能为空' });
+    const nl = rebuildFirstLine(lines[b.start], firstText || ' ');
     if (!nl) return json(res, 400, { error: '该行不支持编辑' });
-    lines[b.start] = nl;
+    if (!parts.length) { // 单行编辑：只改首行，子行保持原样
+      lines[b.start] = nl;
+    } else {            // 整块编辑：重写子行，LOGBOOK 等计时记录保留在首行之后
+      const meta = [];
+      for (let k = b.start + 1; k <= b.end; k++) {
+        if (/^\s*(:LOGBOOK:|:END:|CLOCK:|\* State |SCHEDULED:|DEADLINE:)/.test(lines[k])) meta.push(lines[k]);
+      }
+      const newBlock = [nl].concat(meta);
+      parts.forEach(function (l) {
+        newBlock.push(l.trim() ? '  ' + l.replace(/^\s+/, '') : '');
+      });
+      lines.splice(b.start, b.end - b.start + 1, ...newBlock);
+    }
     fs.writeFileSync(full, lines.join('\n'));
     return json(res, 200, { ok: true });
   }
