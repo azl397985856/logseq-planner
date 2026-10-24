@@ -260,6 +260,7 @@ function renderPage() {
       continue;
     }
     if (b.kind === 'task' || (b.kind === 'bullet' && b.text)) {
+      if (b.kind !== 'task' && isMetaOnly(b)) { sectionEl._lastEnd = b.end; continue; }
       flushPlain();
       const wrap = blockEl(b);
       sectionEl.appendChild(wrap);
@@ -267,6 +268,7 @@ function renderPage() {
       else sectionEl._hasContent = true;
       sectionEl._lastEnd = b.end;
     } else if (b.kind === 'bullet') {
+      if (isMetaOnly(b)) { sectionEl._lastEnd = b.end; continue; }
       if (childLines(b).length) sectionEl._hasContent = true;
       pushChildPlain(b);
       sectionEl._lastEnd = b.end;
@@ -319,6 +321,20 @@ function pushChildPlain(b) {
   if (!sub.length) return;
   plainBuf.push(sub.map(l => `<div class="plain-line">${renderText(l.replace(/\t/g, '    '))}</div>`).join(''));
   plainLines += sub.length;
+}
+
+/* 纯日志空块：没有文字内容，只剩 LOGBOOK/CLOCK 计时残留（logseq 删文字后遗留的壳） */
+function isMetaOnly(b) {
+  const META_RE = /^\s*(?::LOGBOOK:|:END:|CLOCK:|\* State |SCHEDULED:|DEADLINE:)/;
+  const first = PAGE.lines[b.start];
+  const firstText = first.replace(/^\s*-\s?/, '').trim();
+  if (firstText && firstText !== ':LOGBOOK:') return false;
+  for (let k = b.start; k <= b.end; k++) {
+    const l = PAGE.lines[k];
+    if (!l.trim()) continue;
+    if (!META_RE.test(l)) return false;
+  }
+  return true;
 }
 
 function childLines(b) {
