@@ -292,6 +292,17 @@ a.wikilink { cursor: pointer; }
 section .pl-item::before { background: var(--sec, #b9b5a1); opacity: .55; }
 .pl-num .pl-no { color: var(--muted); font-weight: 700; margin-right: 7px; }
 .pl-cont { padding-left: 15px; color: #7c7867; }
+/* 折叠笔记单行删除 */
+.plain-line { padding-right: 26px; }
+.pl-del {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border: none; border-radius: 6px;
+  background: #fff; color: #8a8674; cursor: pointer; font-size: 10px; line-height: 1;
+  opacity: 0; transition: opacity .15s, background .15s;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.plain-line:hover .pl-del { opacity: 1; }
+.pl-del:hover { background: #fce4dc; color: var(--red); }
 
 /* 悬浮操作 */
 .row-actions {

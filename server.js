@@ -498,9 +498,13 @@ async function handleApi(req, res, p, u) {
     if (!fs.existsSync(full)) return json(res, 404, { error: '页面不存在' });
     const lines = fs.readFileSync(full, 'utf8').split('\n');
     const blocks = fillPseudoBlocks(lines, splitBlocks(lines));
-    const b = findBlockAt(blocks, body.line | 0);
-    if (!b) return json(res, 409, { error: 'STALE', message: '文件已变化，请刷新后重试' });
-    lines.splice(b.start, b.end - b.start + 1);
+    const idx = body.line | 0;
+    // 找到包含该行的块：行号是块首 → 删整块；是块内子行 → 只删那一行
+    let target = null;
+    for (const b of blocks) { if (idx >= b.start && idx <= b.end) { target = b; break; } }
+    if (!target) return json(res, 409, { error: 'STALE', message: '文件已变化，请刷新后重试' });
+    if (idx === target.start) lines.splice(target.start, target.end - target.start + 1);
+    else lines.splice(idx, 1);
     fs.writeFileSync(full, lines.join('\n'));
     return json(res, 200, { ok: true });
   }

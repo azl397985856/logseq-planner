@@ -368,20 +368,34 @@ function childLines(b) {
     if (/^\s*:(LOGBOOK|END):\s*$/.test(l)) continue;
     if (/^\s*CLOCK:/.test(l)) continue;
     if (/^\s*\* State /.test(l)) continue;
-    out.push(l);
+    out.push({ k: k, text: l });
   }
   return out;
 }
 
-/* 折叠笔记里的普通行：原始 markdown 横杠换成圆点，带序号的行保留序号 */
-function renderPlainLine(l) {
-  const s = l.replace(/\t/g, '    ');
+/* 折叠笔记里的普通行：原始 markdown 横杠换成圆点，带序号的行保留序号；悬浮可单行删除 */
+function renderPlainLine(item) {
+  const s = item.text.replace(/\t/g, '    ');
+  const del = `<button class="pl-del" data-line="${item.k}" title="删除此行">✕</button>`;
   let m = /^\s*-\s+(.+)$/.exec(s);
-  if (m) return `<div class="plain-line pl-item">${renderText(m[1])}</div>`;
+  if (m) return `<div class="plain-line pl-item">${renderText(m[1])}${del}</div>`;
   m = /^\s*(\d+[.)])\s+(.+)$/.exec(s);
-  if (m) return `<div class="plain-line pl-item pl-num"><span class="pl-no">${m[1]}</span>${renderText(m[2])}</div>`;
-  return `<div class="plain-line pl-cont">${renderText(s)}</div>`;
+  if (m) return `<div class="plain-line pl-item pl-num"><span class="pl-no">${m[1]}</span>${renderText(m[2])}${del}</div>`;
+  return `<div class="plain-line pl-cont">${renderText(s)}${del}</div>`;
 }
+
+/* 行级删除（折叠笔记 / 任务子行里的单行 ✕） */
+document.addEventListener('click', async e => {
+  const del = e.target.closest('.pl-del');
+  if (!del) return;
+  e.stopPropagation();
+  if (!confirm('删除这一行？')) return;
+  const r = await post('/api/delete', { name: PAGE.name, line: parseInt(del.dataset.line, 10) });
+  if (!r.ok) { toast(r.body.message || r.body.error || '删除失败', true); return; }
+  noteSelfWrite(PAGE.name);
+  toast('已删除');
+  loadPage(PAGE.name);
+});
 
 /* ---------- 块渲染（含悬浮编辑/删除） ---------- */
 function blockEl(b) {
@@ -434,7 +448,7 @@ function blockEl(b) {
 /* ---------- 行内编辑（整块：首行 + 子行） ---------- */
 function startEdit(wrap, b) {
   if (wrap.querySelector('.editor')) return;
-  const children = childLines(b).map(l => l.replace(/^\s+/, ''));
+  const children = childLines(b).map(it => it.text.replace(/^\s+/, ''));
   const hasChildren = children.length > 0;
   const editor = document.createElement('div');
   editor.className = 'editor';
