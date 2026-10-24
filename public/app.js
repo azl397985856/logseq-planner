@@ -752,6 +752,26 @@ async function init() {
     if (PAGE) loadPage(PAGE.name);
     refreshData().then(renderSidebar);
   });
+  $('#btnDeletePage').addEventListener('click', async () => {
+    if (!PAGE) return;
+    const name = PAGE.name;
+    if (!confirm('确定删除页面「' + name + '」？\n\n文件会先自动备份到 logseq/bak/pages/，可随时找回。')) return;
+    const r = await post('/api/delete-page', { name: name });
+    if (!r.ok) { toast(r.body.error || '删除失败', true); return; }
+    toast('已删除「' + name + '」（有备份）');
+    PAGE = null; VIEW = null;
+    await refreshData();
+    // 删完跳到当前月（或最近一个过去的月份）
+    const cur = `plan-${DATA.today.year}-${String(DATA.today.month).padStart(2, '0')}`;
+    let openName = null;
+    if (DATA.months.some(m => m.name === cur)) openName = cur;
+    else {
+      const past = DATA.months.filter(m => m.year < DATA.today.year || (m.year === DATA.today.year && m.month <= DATA.today.month));
+      openName = past.length ? past[past.length - 1].name : (DATA.months.length ? DATA.months[DATA.months.length - 1].name : null);
+    }
+    if (openName) loadPage(openName);
+    else { location.hash = ''; $('#pageTitle').textContent = 'Logseq 计划助手'; $('#content').innerHTML = '<div class="banner">pages/ 下没有月度计划了</div>'; renderSidebar(); }
+  });
   connectEvents();
 
   const hash = decodeURIComponent(location.hash.slice(1));

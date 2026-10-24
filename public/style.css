@@ -175,6 +175,8 @@ nav { flex: 1; padding: 12px 10px; }
 .btn.ghost:hover { background: rgba(38,37,29,.06); box-shadow: none; transform: none; }
 .btn.icon { padding: 8px 11px; font-size: 15px; line-height: 1; }
 .btn.small { padding: 4px 11px; font-size: 12px; }
+.btn.danger { color: var(--red); }
+.btn.danger:hover { background: #fce4dc; color: var(--red); box-shadow: none; transform: none; }
 
 .banner {
   background: linear-gradient(180deg, #fdf4dc, #fbf2da);

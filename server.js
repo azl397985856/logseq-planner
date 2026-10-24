@@ -508,6 +508,17 @@ async function handleApi(req, res, p, u) {
     fs.writeFileSync(full, lines.join('\n'));
     return json(res, 200, { ok: true });
   }
+  if (p === '/api/delete-page' && req.method === 'POST') {
+    const body = await readBody(req);
+    const name = String(body.name || '');
+    if (!safeName(name + '.md')) return json(res, 400, { error: '页面名不合法' });
+    const full = pagePath(name + '.md');
+    if (!fs.existsSync(full)) return json(res, 404, { error: '页面不存在' });
+    fs.mkdirSync(BAK, { recursive: true });
+    fs.copyFileSync(full, path.join(BAK, timestampForBak() + '.' + name + '.md'));
+    fs.unlinkSync(full);
+    return json(res, 200, { ok: true });
+  }
   json(res, 404, { error: 'no such api' });
 }
 
