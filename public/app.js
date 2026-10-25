@@ -151,6 +151,7 @@ function renderPage() {
 
   $('#btnGen').hidden = !isPlan;
   $('#btnOpenLogseq').hidden = false;
+  $('#btnDeletePage').hidden = false;
   $('#btnOpenLogseq').onclick = () => {
     window.open(`logseq://graph/${encodeURIComponent(DATA.graphName)}?page=${encodeURIComponent(name)}`);
   };
@@ -742,6 +743,55 @@ async function submitGen() {
   loadPage('plan-' + $('#genGo').dataset.target);
 }
 
+/* ---------- 读书墙 ---------- */
+let bookYear = null;
+async function loadBooks() {
+  const r = await api('/api/books');
+  if (!r.ok) { toast('加载失败', true); return; }
+  VIEW = { type: 'books' };
+  PAGE = null;
+  renderSidebar();
+  $('#pageTitle').innerHTML = '📚 读书墙';
+  $('#pageMeta').innerHTML = '';
+  $('#btnGen').hidden = true;
+  $('#btnDeletePage').hidden = true;
+  $('#btnOpenLogseq').hidden = true;
+  $('#banner').innerHTML = '';
+  const d = r.body;
+
+  // 年份统计
+  const byYear = {};
+  d.books.forEach(b => { const y = b.month.slice(0, 4); byYear[y] = (byYear[y] || 0) + 1; });
+  const years = Object.keys(byYear).sort();
+  const c = $('#content');
+  c.innerHTML = `
+    <div class="books-hero">
+      <div class="big-num">${d.total}<span class="big-unit">本</span></div>
+      <div class="muted">2022 年至今读完的书</div>
+      <div class="year-chips">${years.map(y =>
+        `<button class="chip year-chip ${bookYear === y ? 'active' : ''}" data-y="${y}">${y} · ${byYear[y]}</button>`).join('')}
+      ${bookYear ? '<button class="chip year-chip" data-y="">全部</button>' : ''}</div>
+    </div>
+    <div class="book-wall"></div>`;
+  c.querySelectorAll('.year-chip').forEach(ch =>
+    ch.addEventListener('click', () => { bookYear = ch.dataset.y || null; loadBooks(); }));
+
+  const wall = c.querySelector('.book-wall');
+  const list = d.books.filter(b => !bookYear || b.month.startsWith(bookYear)).reverse();
+  list.forEach(b => {
+    const card = document.createElement('a');
+    card.className = 'book-card';
+    card.href = '#' + b.file;
+    card.title = b.text;
+    card.innerHTML =
+      `<div class="bc-month">${b.month} 完成</div>` +
+      `<div class="bc-title">${renderText(b.text)}</div>`;
+    card.addEventListener('click', e => { e.preventDefault(); loadPage(b.file); });
+    wall.appendChild(card);
+  });
+  if (!list.length) wall.innerHTML = '<div class="muted-small">这个年份还没有读完的书</div>';
+}
+
 /* ---------- 初始化 ---------- */
 async function refreshData() {
   const r = await api('/api/data');
@@ -756,6 +806,7 @@ async function init() {
   $('#genPreviewBtn').addEventListener('click', previewGen);
   $('#genGo').addEventListener('click', submitGen);
   $('#genCancel').addEventListener('click', () => $('#genDialog').close());
+  $('#navBooks').addEventListener('click', loadBooks);
   $('#btnReload').addEventListener('click', () => {
     if (PAGE) loadPage(PAGE.name);
     refreshData().then(renderSidebar);

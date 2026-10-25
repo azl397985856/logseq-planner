@@ -517,6 +517,22 @@ async function handleApi(req, res, p, u) {
     fs.writeFileSync(full, lines.join('\n'));
     return json(res, 200, { ok: true });
   }
+  if (p === '/api/books' && req.method === 'GET') {
+    // 读书墙：所有月份 book 分区里 DONE 的条目（按月、含 LOGBOOK 时长）
+    const files = fs.readdirSync(PAGES).filter(function (f) { return /^plan-\d{4}-\d{2}\.md$/.test(f); }).sort();
+    const books = [];
+    for (const f of files) {
+      let page;
+      try { page = parsePage(fs.readFileSync(pagePath(f), 'utf8')); } catch (e) { continue; }
+      for (const b of page.blocks) {
+        if (b.kind !== 'task' || b.status !== 'DONE' || !b.text) continue;
+        if (!/book|书/i.test(b.section || '')) continue;
+        if (/^\d+\s*本/.test(b.text.trim())) continue; // 「20 本(20/20)」这类统计条目不算书
+        books.push({ text: b.text, month: f.slice(5, 12), seconds: b.seconds || 0, file: f.slice(0, -3) });
+      }
+    }
+    return json(res, 200, { total: books.length, books: books });
+  }
   if (p === '/api/delete-page' && req.method === 'POST') {
     const body = await readBody(req);
     const name = String(body.name || '');
