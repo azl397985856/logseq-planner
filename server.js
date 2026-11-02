@@ -209,10 +209,22 @@ function buildFromTemplate(templateText, carried) {
   }
   spans.push({ title: cur.title, start: cur.start, end: lines.length - 1 });
 
+  // 模板里和携带条目重复的（如三联/小宇宙），跳过模板那份、用携带的（保留 LOGBOOK 历史）
+  const carriedTexts = new Set(carried.map(function (c) { return normalizeTitle(c.text); }));
+  const tplSkip = new Set();
+  for (const b of blocks) {
+    const info = blockInfo(lines, b, { title: '', level: 0 });
+    if (info.kind === 'task' && info.text && carriedTexts.has(normalizeTitle(info.text))) {
+      for (let k = b.start; k <= b.end; k++) tplSkip.add(k);
+    }
+  }
+
   const out = [];
   const used = new Set();
   for (const sp of spans) {
-    for (let k = sp.start; k <= sp.end; k++) out.push(lines[k]);
+    for (let k = sp.start; k <= sp.end; k++) {
+      if (!tplSkip.has(k)) out.push(lines[k]);
+    }
     carried.forEach(function (c, i) {
       if (used.has(i)) return;
       if (normalizeTitle(c.section) !== normalizeTitle(sp.title)) return;

@@ -1,6 +1,7 @@
 'use strict';
-/* Logseq 计划助手 - 前端 */
+/* Logseq 计划助手 - 前端（服务端模式 / 静态本地模式 双模式） */
 const $ = s => document.querySelector(s);
+const STATIC = !!window.STATIC_MODE;
 
 let DATA = null;        // /api/data 结果
 let VIEW = null;        // {type:'page', name}
@@ -15,6 +16,20 @@ function api(path, opts) {
 function post(path, data) {
   return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
+/* 数据层：静态模式走 StaticData（浏览器本地），否则走本地 server API */
+const DS = STATIC ? window.StaticData : {
+  data: () => api('/api/data'),
+  page: name => api('/api/page?name=' + encodeURIComponent(name)),
+  status: p => post('/api/status', p),
+  edit: p => post('/api/edit', p),
+  add: p => post('/api/add', p),
+  del: p => post('/api/delete', p),
+  deletePage: p => post('/api/delete-page', p),
+  createPage: p => post('/api/create-page', p),
+  preview: p => post('/api/preview', p),
+  generate: p => post('/api/generate', p),
+  books: () => api('/api/books')
+};
 
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -28,7 +43,11 @@ function renderText(text) {
     let u = src.replace(/&amp;/g, '&');
     if (/^https?:\/\//i.test(u)) return `<img class="md-img" src="${escapeHtml(u)}" alt="${escapeHtml(alt)}" loading="lazy">`;
     u = u.replace(/^(\.\.\/)+/, '');
-    if (/^assets\//.test(u)) return `<img class="md-img" src="/${escapeHtml(u)}" alt="${escapeHtml(alt)}" loading="lazy">`;
+    if (/^assets\//.test(u)) {
+      return STATIC
+        ? `<img class="md-img" data-asset="${escapeHtml(u)}" alt="${escapeHtml(alt)}" loading="lazy">`
+        : `<img class="md-img" src="/${escapeHtml(u)}" alt="${escapeHtml(alt)}" loading="lazy">`;
+    }
     return m;
   });
   h = h.replace(/\[\[([^\]]+)\]\]/g, (m, p) => `<a class="wikilink" data-page="${escapeHtml(p.trim())}" href="#">${p.trim()}</a>`);
@@ -99,7 +118,7 @@ function renderPageList() {
 async function loadPage(name) {
   const keepScroll = PAGE && PAGE.name === name;
   const y = keepScroll ? window.scrollY : 0;
-  const r = await api('/api/page?name=' + encodeURIComponent(name));
+  const r = await DS.page(name);
   if (!r.ok) { toast(r.body.error || '加载失败', true); return; }
   PAGE = r.body;
   VIEW = { type: 'page', name: name };
@@ -150,9 +169,9 @@ function renderPage() {
     (isCur ? '<span class="meta-chip passive">当前月</span>' : '');
 
   $('#btnGen').hidden = !isPlan;
-  $('#btnOpenLogseq').hidden = false;
+  $('#btnOpenLogseq').hidden = STATIC;
   $('#btnDeletePage').hidden = false;
-  $('#btnOpenLogseq').onclick = () => {
+  if (!STATIC) $('#btnOpenLogseq').onclick = () => {
     window.open(`logseq://graph/${encodeURIComponent(DATA.graphName)}?page=${encodeURIComponent(name)}`);
   };
 
@@ -315,6 +334,8 @@ function renderPage() {
     if (!ALWAYS_ADD.test(sec._title) && sec._taskCount === 0 && sec._hasContent) return;
     attachAddBar(sec);
   });
+
+  if (STATIC && window.StaticData) window.StaticData.hydrateImages(c);
 }
 
 /* 连续的、标题含数字的二级标题（如 `## 1kw * 8% / 12 = 6.67W`）合并为一条参考表 */
@@ -399,7 +420,7 @@ document.addEventListener('click', async e => {
   if (!del) return;
   e.stopPropagation();
   if (!confirm('删除这一行？')) return;
-  const r = await post('/api/delete', { name: PAGE.name, line: parseInt(del.dataset.line, 10) });
+  const r = await DS.del({ name: PAGE.name, line: parseInt(del.dataset.line, 10) });
   if (!r.ok) { toast(r.body.message || r.body.error || '删除失败', true); return; }
   noteSelfWrite(PAGE.name);
   toast('已删除');
@@ -442,7 +463,7 @@ function blockEl(b) {
   actions.querySelector('.ra-del').addEventListener('click', async e => {
     e.stopPropagation();
     if (!confirm('删除这条内容？（连同其子内容，旧月份数据建议保留）')) return;
-    const r = await post('/api/delete', { name: PAGE.name, line: b.start });
+    const r = await DS.del({ name: PAGE.name, line: b.start });
     if (!r.ok) { toast(r.body.message || r.body.error || '删除失败', true); return; }
     noteSelfWrite(PAGE.name);
     toast('已删除');
@@ -485,7 +506,7 @@ function startEdit(wrap, b) {
   const save = async () => {
     const text = ta.value.replace(/\s+$/, '');
     if (!text.trim()) { toast('内容不能为空', true); return; }
-    const r = await post('/api/edit', { name: PAGE.name, line: b.start, text: text });
+    const r = await DS.edit({ name: PAGE.name, line: b.start, text: text });
     if (!r.ok) { toast(r.body.message || r.body.error || '保存失败', true); return; }
     noteSelfWrite(PAGE.name);
     toast('已保存');
@@ -528,7 +549,7 @@ function attachAddBar(sectionEl) {
     const text = input.value.trim();
     if (!text) return;
     const afterLine = sectionEl._lastEnd != null ? sectionEl._lastEnd : -1;
-    const r = await post('/api/add', {
+    const r = await DS.add({
       name: PAGE.name, afterLine: afterLine,
       status: bar.querySelector('.add-status').value, text: text
     });
@@ -605,7 +626,7 @@ function showStatusMenu(x, y, block) {
   menu.querySelectorAll('.sm-item').forEach(item => {
     item.addEventListener('click', async () => {
       menu.hidden = true;
-      const r = await post('/api/status', { name: PAGE.name, line: block.start, status: item.dataset.s });
+      const r = await DS.status({ name: PAGE.name, line: block.start, status: item.dataset.s });
       if (!r.ok) { toast(r.body.error || '修改失败', true); return; }
       noteSelfWrite(PAGE.name);
       toast('已更新状态');
@@ -636,7 +657,7 @@ document.addEventListener('click', async e => {
     loadPage(name);
     return;
   }
-  const r = await post('/api/create-page', { name: name });
+  const r = await DS.createPage({ name: name });
   if (!r.ok) { toast(r.body.error || '创建失败', true); return; }
   await refreshData();
   toast('已创建页面：' + name);
@@ -655,6 +676,11 @@ function scheduleReload(file) {
 }
 function connectEvents() {
   const dot = $('#syncDot'), txt = $('#syncText');
+  if (STATIC) {
+    dot.className = 'sync-dot on';
+    txt.textContent = '本地数据 · 不上传服务器';
+    return;
+  }
   const es = new EventSource('/api/events');
   es.onopen = () => { dot.className = 'sync-dot on'; txt.textContent = '已连接，自动同步'; };
   es.onerror = () => { dot.className = 'sync-dot off'; txt.textContent = '连接断开，重试中…'; };
@@ -702,7 +728,7 @@ async function previewGen() {
   const source = $('#genSource').value;
   const target = $('#genTarget').value.trim();
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(target)) { toast('目标月份格式应为 YYYY-MM', true); return; }
-  const r = await post('/api/preview', { source: source, target: target, cleanOpen: $('#genClean').checked });
+  const r = await DS.preview({ source: source, target: target, cleanOpen: $('#genClean').checked });
   if (!r.ok) { toast(r.body.error || '预览失败', true); return; }
   const d = r.body;
   const carried = d.carried, done = d.droppedDone;
@@ -730,7 +756,7 @@ async function submitGen() {
   if ($('#genOverwrite').hidden === false && !$('#genOverwriteChk').checked) {
     toast('请先勾选确认覆盖', true); return;
   }
-  const r = await post('/api/generate', {
+  const r = await DS.generate({
     source: $('#genGo').dataset.source,
     target: $('#genGo').dataset.target,
     cleanOpen: $('#genClean').checked,
@@ -746,7 +772,7 @@ async function submitGen() {
 /* ---------- 读书墙 ---------- */
 let bookYear = null;
 async function loadBooks() {
-  const r = await api('/api/books');
+  const r = await DS.books();
   if (!r.ok) { toast('加载失败', true); return; }
   VIEW = { type: 'books' };
   PAGE = null;
@@ -794,13 +820,51 @@ async function loadBooks() {
 
 /* ---------- 初始化 ---------- */
 async function refreshData() {
-  const r = await api('/api/data');
+  const r = await DS.data();
   DATA = r.body;
 }
 
+/* ---------- 静态模式欢迎页（选择数据目录 / 上传文件） ---------- */
+function showWelcome(needPermission) {
+  $('#pageTitle').textContent = 'Logseq 计划助手';
+  $('#pageMeta').innerHTML = '';
+  $('#btnGen').hidden = true;
+  $('#btnOpenLogseq').hidden = true;
+  $('#btnDeletePage').hidden = true;
+  $('#banner').innerHTML = '';
+  const fsApi = 'showDirectoryPicker' in window;
+  $('#content').innerHTML = `
+    <div class="welcome">
+      <div class="w-logo">✦</div>
+      <h2>把你的 Logseq 库装进来</h2>
+      <p class="w-desc">所有数据只在你自己的浏览器里处理，<b>不会上传到任何服务器</b>。<br>
+      选择你的 Logseq 库目录（含 pages/ 的那个文件夹）后即可浏览和编辑，改动直接写回你本地的 md 文件。</p>
+      ${needPermission
+        ? '<button class="btn primary" id="wReconnect">🔗 重新连接上次的数据目录</button>'
+        : (fsApi
+          ? '<button class="btn primary" id="wPick">📁 选择数据目录</button>'
+          : '<p class="muted-small">当前浏览器不支持目录选择，请用「上传文件夹」方式（只读）或换 Chrome/Edge。</p>')}
+      <div class="w-or">或</div>
+      <button class="btn" id="wUpload">⬆️ 上传 pages 文件夹（只读预览）</button>
+      <p class="muted-small w-hint">上传方式不会写回文件；目录方式支持完整编辑并写回本地 md。</p>
+    </div>`;
+  const pick = $('#wPick');
+  if (pick) pick.addEventListener('click', () => {
+    window.StaticData.pickDirectory().then(() => init()).catch(e => {
+      if (e && e.name !== 'AbortError') toast('选择目录失败：' + e.message, true);
+    });
+  });
+  const re = $('#wReconnect');
+  if (re) re.addEventListener('click', () => {
+    window.StaticData.reconnect().then(ok => {
+      if (ok) init();
+      else toast('未获得目录权限', true);
+    });
+  });
+  $('#wUpload').addEventListener('click', () => $('#dirInput').click());
+}
+
 async function init() {
-  await refreshData();
-  renderSidebar();
   $('#pageFilter').addEventListener('input', renderPageList);
   $('#btnGen').addEventListener('click', openGenDialog);
   $('#genPreviewBtn').addEventListener('click', previewGen);
@@ -815,7 +879,7 @@ async function init() {
     if (!PAGE) return;
     const name = PAGE.name;
     if (!confirm('确定删除页面「' + name + '」？\n\n文件会先自动备份到 logseq/bak/pages/，可随时找回。')) return;
-    const r = await post('/api/delete-page', { name: name });
+    const r = await DS.deletePage({ name: name });
     if (!r.ok) { toast(r.body.error || '删除失败', true); return; }
     toast('已删除「' + name + '」（有备份）');
     PAGE = null; VIEW = null;
@@ -832,6 +896,27 @@ async function init() {
     else { location.hash = ''; $('#pageTitle').textContent = 'Logseq 计划助手'; $('#content').innerHTML = '<div class="banner">pages/ 下没有月度计划了</div>'; renderSidebar(); }
   });
   connectEvents();
+
+  await refreshData();
+  renderSidebar();
+
+  if (STATIC) {
+    $('#btnChangeData').hidden = false;
+    $('#btnChangeData').addEventListener('click', () => showWelcome(false));
+    $('#dirInput').addEventListener('change', e => {
+      if (e.target.files.length) {
+        window.StaticData.importFiles(e.target.files);
+        init();
+      }
+    });
+  }
+
+  if (STATIC && DATA.noData) {
+    // 尝试恢复上次的数据目录
+    const st = await window.StaticData.tryRestore();
+    if (st === 'loaded') { await refreshData(); renderSidebar(); }
+    else { showWelcome(st === 'need-permission'); return; }
+  }
 
   const hash = decodeURIComponent(location.hash.slice(1));
   if (hash && (DATA.months.some(m => m.name === hash) || DATA.pages.includes(hash))) {

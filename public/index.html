@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Logseq 计划助手</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <div id="app">
@@ -32,6 +32,7 @@
     <div class="sidebar-foot">
       <div class="sync-line"><span class="sync-dot" id="syncDot"></span><span id="syncText">已连接，自动同步</span></div>
       <div class="muted-small">数据源是 pages/ 下的 markdown，改动直接写回，Logseq 实时同步</div>
+      <button id="btnChangeData" class="btn small ghost" hidden>更改数据目录</button>
     </div>
   </aside>
 
@@ -80,7 +81,10 @@
 
 <div id="statusMenu" class="menu" hidden></div>
 <div id="toast" hidden></div>
+<input type="file" id="dirInput" webkitdirectory multiple hidden>
 
-<script src="/app.js"></script>
+<script src="./parser.js"></script>
+<script src="./static.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>
