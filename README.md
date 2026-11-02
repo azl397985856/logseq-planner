@@ -1,12 +1,19 @@
 # Logseq 计划助手
 
-一个零依赖的本地小工具，解决「每月复制上个月 `plan-YYYY-MM.md` → 手工删 DONE → 改状态」这个重复劳动。数据只有一份：`pages/` 下的 markdown（Logseq 的库），网页是它的实时视图。
+两种使用方式：
 
-## 启动
+## 🌐 在线版（推荐日常使用）
 
-双击 `启动.command`（或命令行 `node server.js`），浏览器会自动打开 http://127.0.0.1:5217 。
+**https://lucifer.ren/logseq-planner/**（或 https://azl397985856.github.io/logseq-planner/）
 
-默认读取同级目录下的 `../logseq` 库；也可以 `node server.js /path/to/你的logseq库` 指定其他位置。
+纯浏览器本地运行，**数据不上传到任何服务器**：
+
+1. 打开网站，点「选择数据目录」，选中你的 Logseq 库目录（含 `pages/` 的那个文件夹）——改动直接写回你本地的 md 文件，目录会被记住，下次一键恢复（需 Chrome/Edge）
+2. 没有支持的浏览器也可以点「上传 pages 文件夹」只读预览
+
+## 💻 本地服务版（调试用）
+
+`node server.js` 或双击 `启动.command` → http://127.0.0.1:5217 ，默认读 `~/Documents/logseq`，也可 `node server.js /path/to/graph` 指定。带文件监听实时同步和 Logseq 深链。
 
 ## 功能
 
