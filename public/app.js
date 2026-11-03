@@ -840,16 +840,21 @@ function showWelcome(needPermission) {
   $('#btnDeletePage').hidden = true;
   $('#banner').innerHTML = '';
   const secure = window.isSecureContext;
-  const fsApi = 'showDirectoryPicker' in window;
-  // 诊断：HTTP 访问 → 提示切换 HTTPS；Brave 等默认关闭目录 API → 给开关指引
+  const fsApi = typeof window.showDirectoryPicker === 'function';
+  // 按钮始终展示：不可用时置灰 + 原因说明，让用户知道功能存在
+  const canPick = secure && fsApi;
+  let pickTitle = '';
   let diag = '';
-  if (!secure) {
-    diag = `<p class="w-warn">当前是通过 <b>HTTP</b> 打开的，浏览器会禁止目录访问。<br>
-      <a class="w-link" href="https://${location.host}${location.pathname}">点此切换到 HTTPS 重新打开</a>，即可使用目录选择。</p>`;
-  } else if (!fsApi) {
-    diag = `<p class="w-warn">你的浏览器内核支持但默认关闭了「文件目录访问」（Brave 出于隐私默认关闭）。<br>
-      打开 <b>brave://flags/#file-system-access-api</b> 设为 Enabled 并重启浏览器，刷新本页即可；<br>
-      也可以先使用下方的上传方式（功能完整，数据存在浏览器里）。</p>`;
+  if (!needPermission && !canPick) {
+    if (!secure) {
+      pickTitle = 'HTTP 页面浏览器禁止目录访问：点击下方提示里的 HTTPS 链接切换后刷新即可';
+      diag = `<p class="w-warn">当前是通过 <b>HTTP</b> 打开的，浏览器会禁止目录访问，所以上面的按钮是灰的。<br>
+        <a class="w-link" href="https://${location.host}${location.pathname}">点此切换到 HTTPS 重新打开</a>，按钮就能用了。</p>`;
+    } else {
+      pickTitle = '当前浏览器关闭了目录访问能力：Brave 请开启 brave://flags/#file-system-access-api 后重启浏览器';
+      diag = `<p class="w-warn">你的浏览器内核支持、但默认关闭了「文件目录访问」（Brave 出于隐私默认关闭），所以上面的按钮是灰的。<br>
+        打开 <b>brave://flags/#file-system-access-api</b> 设为 Enabled 并重启浏览器，刷新本页即可开启。</p>`;
+    }
   }
   $('#content').innerHTML = `
     <div class="welcome">
@@ -857,12 +862,10 @@ function showWelcome(needPermission) {
       <h2>把你的 Logseq 库装进来</h2>
       <p class="w-desc">所有数据只在你自己的浏览器里处理，<b>不会上传到任何服务器</b>。<br>
       选择你的 Logseq 库目录（含 pages/ 的那个文件夹）后即可浏览和编辑，改动直接写回你本地的 md 文件。</p>
-      ${diag}
       ${needPermission
         ? '<button class="btn primary" id="wReconnect">🔗 重新连接上次的数据目录</button>'
-        : (secure && fsApi
-          ? '<button class="btn primary" id="wPick">📁 选择数据目录</button>'
-          : '')}
+        : `<button class="btn primary" id="wPick" ${canPick ? '' : 'disabled title="' + escapeHtml(pickTitle) + '"'}>📁 选择数据目录</button>`}
+      ${diag}
       <div class="w-or">或</div>
       <button class="btn" id="wUpload">⬆️ 上传 pages 文件夹</button>
       <p class="muted-small w-hint">两种方式都支持编辑：目录方式改动写回本地 md；上传方式的数据保存在此浏览器中（刷新不丢），可用侧边栏「导出全部 md」取回。</p>
