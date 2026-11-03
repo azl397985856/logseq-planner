@@ -561,9 +561,17 @@ async function handleApi(req, res, p, u) {
 
 server.on('error', function (e) {
   if (e.code === 'EADDRINUSE') {
-    const next = PORT + 1;
-    console.error('端口 ' + PORT + ' 被占用，改用 ' + next);
-    server.listen(next, '127.0.0.1');
+    // 同端口已有实例在跑（很可能是常驻服务）→ 自己退出，避免端口漂移出多个实例
+    const ping = require('http').get('http://127.0.0.1:' + PORT + '/api/data', function (res) {
+      res.resume();
+      console.log('端口 ' + PORT + ' 已有计划助手在运行，本次直接退出。');
+      process.exit(0);
+    });
+    ping.on('error', function () {
+      const next = PORT + 1;
+      console.error('端口 ' + PORT + ' 被其他程序占用，改用 ' + next);
+      server.listen(next, '127.0.0.1');
+    });
     return;
   }
   throw e;

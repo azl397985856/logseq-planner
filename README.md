@@ -11,9 +11,13 @@
 1. 打开网站，点「选择数据目录」，选中你的 Logseq 库目录（含 `pages/` 的那个文件夹）——改动直接写回你本地的 md 文件，目录会被记住，下次一键恢复（需 Chrome/Edge）
 2. 没有支持的浏览器也可以点「上传 pages 文件夹」——数据保存在浏览器里（刷新不丢、可编辑），用侧边栏「导出全部 md」取回
 
-## 💻 本地服务版（调试用）
+## 💻 本地服务版（日常推荐，已常驻）
 
-`node server.js` 或双击 `启动.command` → http://127.0.0.1:5217 ，默认读 `~/Documents/logseq`，也可 `node server.js /path/to/graph` 指定。带文件监听实时同步和 Logseq 深链。
+本机已安装 **launchd 常驻服务**（`~/Library/LaunchAgents/com.azl.logseq-planner.plist`）：开机自启、崩溃自动重启，地址 **http://127.0.0.1:5217**，默认读 `~/Documents/logseq`（也可 `node server.js /path/to/graph` 指定）。带文件监听实时同步和 Logseq 深链。
+
+- 双击 `启动.command` 只是打开浏览器；服务没跑时会自动拉起
+- 日志：`~/Library/Logs/logseq-planner.log`
+- 卸载常驻：`launchctl unload -w ~/Library/LaunchAgents/com.azl.logseq-planner.plist && rm ~/Library/LaunchAgents/com.azl.logseq-planner.plist`
 
 ## 功能
 
@@ -45,6 +49,13 @@
 - `月计划模板.md` —— 新月计划的骨架，随便改（自媒体/工作/Bonus 在模板里只是空分区，具体内容在各月份文件里）
 - `工作.md`、`Bonus.md` —— 从月度计划移出的内容（计划里留了 `[[工作]]`/`[[Bonus]]` 链接）
 - `migrate-2026-10.js` —— 一次性迁移脚本（已完成，留着备查）
+
+## 常见问题（在线版浏览器）
+
+- **点了「选择数据目录」没反应 / 显示浏览器不支持**：先确认地址是 **https://** 开头（HTTP 页面浏览器会禁用目录访问，欢迎页有「切换到 HTTPS」链接）；Brave 用户还需要在 `brave://flags/#file-system-access-api` 设为 Enabled 并重启（Brave 默认关闭该能力，Chrome/Edge 无此问题）
+- **隔了几天再打开，要重新连一次目录**：浏览器的授权需要用户点击确认（安全机制），欢迎页点「🔗 重新连接上次的数据目录」即可，授权一次后近期访问都会直接进入
+- **上传模式 vs 目录模式**：目录模式编辑直接写回本地 md；上传模式数据存在浏览器里（刷新不丢、可编辑），要用「导出全部 md」取回
+- **想清空浏览器里的上传数据**：欢迎页「更改数据目录」→ 重新上传即可覆盖
 
 ## 安全性
 
