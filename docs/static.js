@@ -74,15 +74,21 @@ window.StaticData = (function () {
     await loadFromDir();
   }
 
-  /* 启动时尝试恢复上次的数据目录；返回 'loaded' | 'need-permission' | 'none' */
+  /* 启动时尝试恢复数据；优先目录句柄，其次上传快照。返回 'loaded' | 'need-permission' | 'none' */
   async function tryRestore() {
-    if (!('showDirectoryPicker' in window)) return 'none';
-    dirHandle = await idbGet('dir');
-    if (!dirHandle) return 'none';
-    let perm = await dirHandle.queryPermission({ mode: 'readwrite' });
-    if (perm !== 'granted') return 'need-permission';
-    await loadFromDir();
-    return 'loaded';
+    if ('showDirectoryPicker' in window) {
+      dirHandle = await idbGet('dir');
+      if (dirHandle) {
+        const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+          await loadFromDir();
+          return 'loaded';
+        }
+        return 'need-permission';
+      }
+    }
+    if (await loadSnapshot()) return 'loaded';
+    return 'none';
   }
   /* 用户点击按钮时调用（需要手势才能授权） */
   async function reconnect() {
@@ -95,12 +101,14 @@ window.StaticData = (function () {
   }
   async function disconnect() {
     await idbDel('dir');
+    await idbDel(SNAP_KEY);
+    await idbDel(SNAP_ASSETS);
     dirHandle = null; pagesDirHandle = null;
     files.clear(); assets.clear(); dataCache = null;
     writable = false; source = 'none';
   }
 
-  /* 上传文件（只读模式） */
+  /* 上传文件（浏览器持久化：存 IndexedDB，刷新不丢） */
   function importFiles(fileList) {
     files.clear(); assets.clear();
     for (const f of fileList) {
@@ -116,6 +124,64 @@ window.StaticData = (function () {
     writable = false;
     source = 'upload';
     buildData();
+    scheduleSaveSnapshot();
+  }
+
+  /* ---------- 上传快照（IndexedDB 持久化，刷新/重开浏览器不丢） ---------- */
+  const SNAP_KEY = 'upload-snapshot';
+  const SNAP_ASSETS = 'upload-assets';
+  let snapTimer = null;
+  function scheduleSaveSnapshot() {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(saveSnapshot, 300);
+  }
+  async function saveSnapshot() {
+    try {
+      const obj = {};
+      for (const [n, r] of files) obj[n] = await recText(r);
+      await idbPut(SNAP_KEY, obj);
+      const aso = {};
+      for (const [n, e] of assets) {
+        try { aso[n] = await e.getFile(); } catch (e) {}
+      }
+      await idbPut(SNAP_ASSETS, aso);
+    } catch (e) { console.warn('快照保存失败', e); }
+  }
+  async function loadSnapshot() {
+    const snap = await idbGet(SNAP_KEY);
+    if (!snap || !Object.keys(snap).length) return false;
+    for (const [n, text] of Object.entries(snap)) {
+      files.set(n, { handle: null, file: null, text: text });
+    }
+    const aso = await idbGet(SNAP_ASSETS) || {};
+    for (const [n, blob] of Object.entries(aso)) {
+      assets.set(n, { getFile: function () { return Promise.resolve(blob); } });
+    }
+    writable = false;
+    source = 'upload';
+    buildData();
+    return true;
+  }
+
+  /* ---------- 导出 ---------- */
+  function downloadText(name, text) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }));
+    a.download = name + '.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  async function exportPage(name) {
+    const rec = files.get(name);
+    if (!rec) return;
+    downloadText(name, await recText(rec));
+  }
+  async function exportAll() {
+    for (const [n] of files) {
+      downloadText(n, await recText(files.get(n)));
+      await new Promise(function (r) { setTimeout(r, 300); });
+    }
   }
 
   function buildData() {
@@ -149,6 +215,8 @@ window.StaticData = (function () {
       const w = await rec.handle.createWritable();
       await w.write(rec.text);
       await w.close();
+    } else if (source === 'upload') {
+      scheduleSaveSnapshot(); // 上传模式：持久化到浏览器
     }
   }
 
@@ -216,6 +284,7 @@ window.StaticData = (function () {
       try { await pagesDirHandle.removeEntry(name + '.md'); } catch (e) { /* 已不存在 */ }
     }
     buildData();
+    if (source === 'upload') scheduleSaveSnapshot();
     return { ok: true, body: { ok: true } };
   }
 
@@ -259,7 +328,7 @@ window.StaticData = (function () {
   async function generate(body) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(body.target || '')) return { ok: false, body: { error: '目标月份格式应为 YYYY-MM' } };
     const dstName = 'plan-' + body.target;
-    if (files.has(dstName) && !body.overwrite) return { ok: false, body: { error: 'EXISTS' } };
+    if (files.has(dstName) && !body.overwrite) return { ok: false, body: { error: 'EXISTS', targetExists: true } };
     const g = prepareGen(body);
     if (g.error) return { ok: false, body: { error: g.error } };
     const rec = { handle: null, file: null, text: g.outLines.join('\n') };
@@ -273,6 +342,7 @@ window.StaticData = (function () {
       } catch (e) { /* 内存中保留 */ }
     }
     buildData();
+    if (source === 'upload') scheduleSaveSnapshot();
     return { ok: true, body: { ok: true, target: body.target, carried: g.carried.length, droppedDone: g.droppedDone, lineCount: g.outLines.length } };
   }
 
@@ -327,6 +397,8 @@ window.StaticData = (function () {
     generate: generate,
     books: books,
     hydrateImages: hydrateImages,
+    exportPage: exportPage,
+    exportAll: exportAll,
     hasData: function () { return files.size > 0; },
     isWritable: function () { return writable; },
     source: function () { return source; }

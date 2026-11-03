@@ -170,6 +170,7 @@ function renderPage() {
 
   $('#btnGen').hidden = !isPlan;
   $('#btnOpenLogseq').hidden = STATIC;
+  $('#btnDownload').hidden = !STATIC;
   $('#btnDeletePage').hidden = false;
   if (!STATIC) $('#btnOpenLogseq').onclick = () => {
     window.open(`logseq://graph/${encodeURIComponent(DATA.graphName)}?page=${encodeURIComponent(name)}`);
@@ -713,14 +714,12 @@ function openGenDialog() {
   $('#genPreview').hidden = true;
   $('#genPreview').innerHTML = '';
   $('#genOverwrite').hidden = true;
-  $('#genGo').disabled = true;
-  $('#genPreviewBtn').textContent = '预览';
+  $('#genGo').disabled = false;
   dlg.showModal();
   sel.onchange = () => {
     const base = sel.value === '' ? DATA.months[DATA.months.length - 1].name : sel.value;
     $('#genTarget').value = nextMonth(base);
     $('#genPreview').hidden = true;
-    $('#genGo').disabled = true;
   };
 }
 
@@ -747,26 +746,34 @@ async function previewGen() {
   pv.innerHTML = html;
   pv.hidden = false;
   $('#genOverwrite').hidden = !d.targetExists;
-  $('#genGo').disabled = false;
-  $('#genGo').dataset.target = target;
-  $('#genGo').dataset.source = source;
 }
 
 async function submitGen() {
-  if ($('#genOverwrite').hidden === false && !$('#genOverwriteChk').checked) {
-    toast('请先勾选确认覆盖', true); return;
-  }
+  const source = $('#genSource').value;
+  const target = $('#genTarget').value.trim();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(target)) { toast('目标月份格式应为 YYYY-MM', true); return; }
+  const overwrite = $('#genOverwrite').hidden === false && $('#genOverwriteChk').checked;
   const r = await DS.generate({
-    source: $('#genGo').dataset.source,
-    target: $('#genGo').dataset.target,
+    source: source,
+    target: target,
     cleanOpen: $('#genClean').checked,
-    overwrite: !$('#genOverwrite').hidden && $('#genOverwriteChk').checked
+    overwrite: overwrite
   });
-  if (!r.ok) { toast(r.body.error === 'EXISTS' ? '目标已存在，请勾选覆盖' : (r.body.error || '生成失败'), true); return; }
+  if (!r.ok) {
+    if (r.body.error === 'EXISTS') {
+      // 免预览流程里首次撞到已存在：展开覆盖确认
+      $('#genOverwrite').hidden = false;
+      $('#genOverwriteChk').checked = false;
+      toast('目标月份已存在，勾选「确认覆盖」后再点生成', true);
+      return;
+    }
+    toast(r.body.error || '生成失败', true);
+    return;
+  }
   $('#genDialog').close();
-  toast(`已生成 ${$('#genGo').dataset.target}：模板 + 携带 ${r.body.carried} 项`);
+  toast(`已生成 ${target}：模板 + 携带 ${r.body.carried} 项`);
   await refreshData();
-  loadPage('plan-' + $('#genGo').dataset.target);
+  loadPage('plan-' + target);
 }
 
 /* ---------- 读书墙 ---------- */
@@ -845,8 +852,8 @@ function showWelcome(needPermission) {
           ? '<button class="btn primary" id="wPick">📁 选择数据目录</button>'
           : '<p class="muted-small">当前浏览器不支持目录选择，请用「上传文件夹」方式（只读）或换 Chrome/Edge。</p>')}
       <div class="w-or">或</div>
-      <button class="btn" id="wUpload">⬆️ 上传 pages 文件夹（只读预览）</button>
-      <p class="muted-small w-hint">上传方式不会写回文件；目录方式支持完整编辑并写回本地 md。</p>
+      <button class="btn" id="wUpload">⬆️ 上传 pages 文件夹</button>
+      <p class="muted-small w-hint">两种方式都支持编辑：目录方式改动写回本地 md；上传方式的数据保存在此浏览器中（刷新不丢），可用侧边栏「导出全部 md」取回。</p>
     </div>`;
   const pick = $('#wPick');
   if (pick) pick.addEventListener('click', () => {
@@ -871,6 +878,12 @@ async function init() {
   $('#genGo').addEventListener('click', submitGen);
   $('#genCancel').addEventListener('click', () => $('#genDialog').close());
   $('#navBooks').addEventListener('click', loadBooks);
+  $('#btnDownload').addEventListener('click', () => { if (PAGE) window.StaticData.exportPage(PAGE.name); });
+  $('#btnExportAll').addEventListener('click', () => {
+    if (!window.StaticData.hasData()) { toast('没有可导出的数据', true); return; }
+    if (!confirm('将下载 pages/ 下全部 ' + 'md 文件（浏览器可能询问是否允许多文件下载），继续？')) return;
+    window.StaticData.exportAll();
+  });
   $('#btnReload').addEventListener('click', () => {
     if (PAGE) loadPage(PAGE.name);
     refreshData().then(renderSidebar);
@@ -902,6 +915,7 @@ async function init() {
 
   if (STATIC) {
     $('#btnChangeData').hidden = false;
+    $('#btnExportAll').hidden = false;
     $('#btnChangeData').addEventListener('click', () => showWelcome(false));
     $('#dirInput').addEventListener('change', e => {
       if (e.target.files.length) {

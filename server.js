@@ -417,7 +417,7 @@ async function handleApi(req, res, p, u) {
   if (p === '/api/generate' && req.method === 'POST') {
     const body = await readBody(req);
     const dst = pagePath('plan-' + body.target + '.md');
-    if (fs.existsSync(dst) && !body.overwrite) return json(res, 409, { error: 'EXISTS' });
+    if (fs.existsSync(dst) && !body.overwrite) return json(res, 409, { error: 'EXISTS', targetExists: true });
     const g = prepareGen(body);
     if (g.error) return json(res, 400, { error: g.error });
     if (fs.existsSync(dst)) {
