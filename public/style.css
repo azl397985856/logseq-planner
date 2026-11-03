@@ -390,6 +390,12 @@ section.pin h2::before { background: var(--red); }
 .w-desc { color: #6b695f; line-height: 1.8; font-size: 14px; margin-bottom: 24px; }
 .w-or { color: var(--muted); font-size: 12px; margin: 16px 0; letter-spacing: .2em; }
 .w-hint { margin-top: 14px; }
+.w-warn {
+  background: #fdf4dc; border: 1px solid #ecdfb4; border-radius: 10px;
+  padding: 12px 16px; font-size: 13px; color: #7a5c1e;
+  line-height: 1.8; margin-bottom: 20px;
+}
+.w-warn .w-link { font-weight: 700; }
 
 /* 添加条 */
 .add-bar { margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 6px; }

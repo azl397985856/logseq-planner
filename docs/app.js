@@ -839,18 +839,30 @@ function showWelcome(needPermission) {
   $('#btnOpenLogseq').hidden = true;
   $('#btnDeletePage').hidden = true;
   $('#banner').innerHTML = '';
+  const secure = window.isSecureContext;
   const fsApi = 'showDirectoryPicker' in window;
+  // 诊断：HTTP 访问 → 提示切换 HTTPS；Brave 等默认关闭目录 API → 给开关指引
+  let diag = '';
+  if (!secure) {
+    diag = `<p class="w-warn">当前是通过 <b>HTTP</b> 打开的，浏览器会禁止目录访问。<br>
+      <a class="w-link" href="https://${location.host}${location.pathname}">点此切换到 HTTPS 重新打开</a>，即可使用目录选择。</p>`;
+  } else if (!fsApi) {
+    diag = `<p class="w-warn">你的浏览器内核支持但默认关闭了「文件目录访问」（Brave 出于隐私默认关闭）。<br>
+      打开 <b>brave://flags/#file-system-access-api</b> 设为 Enabled 并重启浏览器，刷新本页即可；<br>
+      也可以先使用下方的上传方式（功能完整，数据存在浏览器里）。</p>`;
+  }
   $('#content').innerHTML = `
     <div class="welcome">
       <div class="w-logo">✦</div>
       <h2>把你的 Logseq 库装进来</h2>
       <p class="w-desc">所有数据只在你自己的浏览器里处理，<b>不会上传到任何服务器</b>。<br>
       选择你的 Logseq 库目录（含 pages/ 的那个文件夹）后即可浏览和编辑，改动直接写回你本地的 md 文件。</p>
+      ${diag}
       ${needPermission
         ? '<button class="btn primary" id="wReconnect">🔗 重新连接上次的数据目录</button>'
-        : (fsApi
+        : (secure && fsApi
           ? '<button class="btn primary" id="wPick">📁 选择数据目录</button>'
-          : '<p class="muted-small">当前浏览器不支持目录选择，请用「上传文件夹」方式（只读）或换 Chrome/Edge。</p>')}
+          : '')}
       <div class="w-or">或</div>
       <button class="btn" id="wUpload">⬆️ 上传 pages 文件夹</button>
       <p class="muted-small w-hint">两种方式都支持编辑：目录方式改动写回本地 md；上传方式的数据保存在此浏览器中（刷新不丢），可用侧边栏「导出全部 md」取回。</p>
